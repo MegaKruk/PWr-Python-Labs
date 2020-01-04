@@ -1,106 +1,142 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
-class Boid():
-    def __init__(self, x, y, vel, acc, max_acc, max_vel, perception_range, width, height):
-        self.position = np.array([x, y])
-        self.velocity = np.array([vel])
-        self.acceleration = np.array([acc])
-        self.max_acc = max_acc
-        self.max_vel = max_vel
-        self.perception_range = perception_range
-        self.width = width
-        self.height = height
 
-    def update_self(self):
-        self.position += self.velocity
-        self.velocity += self.acceleration
-        #limit
-        if np.linalg.norm(self.velocity) > self.max_vel:
-            self.velocity = self.velocity / np.linalg.norm(self.velocity) * self.max_vel
-        self.acceleration = np.array([0, 0])
+class Swarm:
+    def __init__(self, sizeOfFlock, xAxis, yAxis):
+        self.sizeOfFlock = sizeOfFlock  # For calculating averages
+        self.bounds = [xAxis, yAxis]
+        self.list = []
+        temp_pos = np.random.randint(yAxis[0], yAxis[1], size=(sizeOfFlock, 2))
+        temp_vel = np.random.randint(-1, 1, size=(sizeOfFlock, 2))
 
-    def apply_rules(self, boids):
-        alignment_ratio = self.alignment(boids)
-        cohesion_ratio = self.cohesion(boids)
-        separation_ratio = self.separation(boids)
-        self.acceleration += [alignment_ratio, alignment_ratio]
-        self.acceleration += [cohesion_ratio, cohesion_ratio]
-        self.acceleration += [separation_ratio, separation_ratio]
+        # By using numpy arrays we can use simple x + y operators,
+        # instead of np.add(x,y). Makes code more readable.
 
-    def edges(self):
-        if self.position.x > self.width:
-            self.position.x = 0
-        elif self.position.x < 0:
-            self.position.x = self.width
+        for i in range(1, sizeOfFlock):
+            self.list.append(
+                Boid(temp_pos[i], temp_vel[i], self))
 
-        if self.position.y > self.height:
-            self.position.y = 0
-        elif self.position.y < 0:
-            self.position.y = self.height
+    def updateSwarm(self):
+        for boid in self.list:
+            # Three main rules
+            v1 = boid.rule1_separation()  # separation, avoiding collision
+            v2 = boid.rule2_alignment()  # alignment, matching velocity
+            v3 = boid.rule3_cohesion()  # cohesion, staying close to others
+            # Extra rules
+            v4 = boid.rule4_bounds()  # bounds, boid should stay inside visible boundaries
 
-    def alignment(self, boids):
-        steering_vector = np.array([0, 0])
-        average_vector = np.array([0, 0])
-        total = 0
-        for boid in boids:
-            if np.linalg.norm(boid.position - self.position) < self.perception_range:
-                average_vector += boid.velocity
-                total += 1
-        if total > 0:
-            average_vector /= total
-            average_vector = (average_vector / np.linalg.norm(average_vector)) * self.max_vel
-            steering_vector = average_vector - self.velocity
+            boid.velocity = boid.velocity + v1 + v2 + v3 + v4
+            # speed limit, no arbitarily fast speeds
+            boid.limitVelocity()
 
-        return steering_vector
+            boid.position = boid.position + boid.velocity
 
-    def cohesion(self, boids):
-        steering_vector = np.array([0, 0])
-        center_of_mass = np.array([0, 0])
-        total = 0
-        for boid in boids:
-            if np.linalg.norm(boid.position - self.position) < self.perception_range:
-                center_of_mass += boid.position
-                total += 1
-        if total > 0:
-            center_of_mass /= total
-            vec_to_com = center_of_mass - self.position
-            if np.linalg.norm(vec_to_com) > 0:
-                vec_to_com = (vec_to_com / np.linalg.norm(vec_to_com)) * self.max_vel
-            steering_vector = vec_to_com - self.velocity
-            if np.linalg.norm(steering_vector)> self.max_acc:
-                steering_vector = (steering_vector /np.linalg.norm(steering_vector)) * self.max_acc
-        return steering_vector
+        return
 
-    def separation(self, boids):
-        steering_vector = np.array([0, 0])
-        average_vector = np.array([0, 0])
-        total = 0
-        for boid in boids:
-            distance = np.linalg.norm(boid.position - self.position)
-            if self.position != boid.position and distance < self.perception_range:
-                diff = self.position - boid.position
-                diff /= distance
-                average_vector += diff
-                total += 1
-        if total > 0:
-            average_vector /= total
-            if np.linalg.norm(steering_vector) > 0:
-                average_vector = (average_vector / np.linalg.norm(steering_vector)) * self.max_vel
-            steering_vector = average_vector - self.velocity
-            if np.linalg.norm(steering_vector) > self.max_acc:
-                steering_vector = (steering_vector /np.linalg.norm(steering_vector)) * self.max_acc
-        return steering_vector
+    def simplePrintSwarm(self):
+        for boid in self.list:
+            print(np.round(boid.position, 1), end='')
+        print('')
+        return
+
+
+class Boid:
+    def __init__(self, pos, vel, swarm):
+        self.swarm = swarm
+        self.position = pos
+        self.velocity = vel
+
+    def rule1_separation(self):
+        correction = np.array([0, 0], dtype=np.float64)
+
+        for boid in self.swarm.list:
+            if boid != self:
+                differenceMagnitude = np.linalg.norm(boid.position - self.position)
+
+                if differenceMagnitude < 10:
+                    correction = correction - (boid.position - self.position)
+
+        return correction / 2
+
+    def rule2_alignment(self):
+        correction = np.array([0, 0], dtype=np.float64)
+
+        for boid in self.swarm.list:
+            if boid != self:
+                correction = correction + boid.velocity
+
+        correction = correction / (self.swarm.sizeOfFlock - 1)
+        correction = (correction - self.velocity) / 10
+
+        return correction
+
+    def rule3_cohesion(self):
+        correction = np.array([0, 0], dtype=np.float64)
+
+        for boid in self.swarm.list:
+            if boid != self:
+                correction = correction + boid.position
+
+        correction = correction / (self.swarm.sizeOfFlock - 1)
+        correction = (correction - self.position) / 100
+
+        return correction
+
+    def rule4_bounds(self):
+        correction = np.array([0, 0], dtype=np.float64)
+
+        # Horizontal bounds
+        if self.position[0] < self.swarm.bounds[0][0]:  # xmin
+            correction[0] = 1
+        elif self.position[0] > self.swarm.bounds[0][1]:  # xmax
+            correction[0] = -1
+
+        # Vertical bounds
+        if self.position[1] < self.swarm.bounds[1][0]:  # ymin
+            correction[1] = 1
+        elif self.position[1] > self.swarm.bounds[1][1]:  # ymax
+            correction[1] = -1
+
+        return correction
+
+    def limitVelocity(self):
+        vlim = 5.0
+
+        velMagnitude = np.linalg.norm(self.velocity)
+
+        # Limit speed if necessary
+        if velMagnitude > vlim:
+            self.velocity = (self.velocity / velMagnitude) * vlim
+            
+X_LIM = [ -500, 500 ]
+Y_LIM = [ -500, 500 ]
+swarm = Swarm( 50, X_LIM, Y_LIM )
+
+fig = plt.figure()
+ax = plt.axes( xlim=X_LIM, ylim=Y_LIM )
+graph, = ax.plot([], [], 'o')
+
+
+def update(i) :
+    #swarm.simplePrintSwarm()
+    swarm.updateSwarm()
+
+    boid_pos_x = []
+    boid_pos_y = []
     
-    def __repr__(self):
-        return str(self.__dict__)
-        
-# arguments: boids number, initial velocity X, initial velocity Y, initial acceleration X, initial acceleration Y, max acceleration, max velocity, perception range, field width, field height
-class Simulation():
-    def __init__(self, boids_number, vel, acc, max_acc, max_vel, perception_range, width, height):
-        boids_list = []
-        for i in range(boids_number):
-            boids_list.append(Boid(i, i, vel, acc, max_acc, max_vel, perception_range, width, height))
-            print(boids_list[i])
+    #data_vel = []
 
-#np.random.seed(None)
-sim = Simulation(20, ((np.random.rand(2) - 0.5)*10), ((np.random.rand(2) - 0.5)/2), 0.3, 5, 100, 1, 2)
+    for boid in swarm.list :
+        boid_pos_x.append( boid.position[0] )
+        boid_pos_y.append( boid.position[1] )
+        #data_vel.append( boid.velocity )
+        
+    graph.set_data(boid_pos_x, boid_pos_y)
+    return graph
+
+
+ani = animation.FuncAnimation(fig, update, frames=30, interval=10)
+
+plt.show()
