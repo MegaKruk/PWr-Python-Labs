@@ -110,8 +110,8 @@ class Boid:
         if velMagnitude > vlim:
             self.velocity = (self.velocity / velMagnitude) * vlim
             
-X_LIM = [ -500, 500 ]
-Y_LIM = [ -500, 500 ]
+X_LIM = [ 0, 1000 ]
+Y_LIM = [ 0, 1000 ]
 swarm = Swarm( 50, X_LIM, Y_LIM )
 
 fig = plt.figure()
@@ -140,3 +140,4 @@ def update(i) :
 ani = animation.FuncAnimation(fig, update, frames=30, interval=10)
 
 plt.show()
+
