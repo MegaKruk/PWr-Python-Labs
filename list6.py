@@ -1,143 +1,108 @@
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 
-class Swarm:
-    def __init__(self, sizeOfFlock, xAxis, yAxis):
-        self.sizeOfFlock = sizeOfFlock  # For calculating averages
-        self.bounds = [xAxis, yAxis]
-        self.list = []
-        temp_pos = np.random.randint(yAxis[0], yAxis[1], size=(sizeOfFlock, 2))
-        temp_vel = np.random.randint(-1, 1, size=(sizeOfFlock, 2))
+class boids_sim:
+    def __init__(self, number_of_boids, width, height, velocity_limit, sight_range):
+        self.number_of_boids = number_of_boids  # For calculating averages
+        self.velocity_limit = velocity_limit
+        self.sight_range = sight_range
+        self.boundaries = [[0, width], [0, height]]
+        self.list_of_boids = []
+        rand_position = np.random.randint(0, height, size=(number_of_boids, 2))
+        rand_velocity = np.random.randint(-1, 1, size=(number_of_boids, 2))
+        for i in range(1, number_of_boids):
+            self.list_of_boids.append(boid(rand_position[i], rand_velocity[i], velocity_limit, sight_range, self)) # list of boids
 
-        # By using numpy arrays we can use simple x + y operators,
-        # instead of np.add(x,y). Makes code more readable.
-
-        for i in range(1, sizeOfFlock):
-            self.list.append(
-                Boid(temp_pos[i], temp_vel[i], self))
-
-    def updateSwarm(self):
-        for boid in self.list:
-            # Three main rules
-            v1 = boid.rule1_separation()  # separation, avoiding collision
-            v2 = boid.rule2_alignment()  # alignment, matching velocity
-            v3 = boid.rule3_cohesion()  # cohesion, staying close to others
-            # Extra rules
-            v4 = boid.rule4_bounds()  # bounds, boid should stay inside visible boundaries
-
-            boid.velocity = boid.velocity + v1 + v2 + v3 + v4
-            # speed limit, no arbitarily fast speeds
-            boid.limitVelocity()
-
+    def update_boids_sim(self):
+        for boid in self.list_of_boids:
+            #three main rules of Reynold's boids
+            r1 = boid.separation()  #separation - avoiding collision with other boids
+            r2 = boid.alignment()   #alignment - matching velocity with other boids
+            r3 = boid.cohesion()    #cohesion - staying close to with other boids
+            #fourth rule so boids won't "fall off"           
+            r4 = boid.boundaries()
+            #apply rules
+            boid.velocity = boid.velocity + r1 + r2 + r3 + r4
+            #velocity limit
+            boid.limit_velocity()
+            #update boid position
             boid.position = boid.position + boid.velocity
 
-        return
 
-    def simplePrintSwarm(self):
-        for boid in self.list:
-            print(np.round(boid.position, 1), end='')
-        print('')
-        return
+class boid:
+    def __init__(self, position, velocity, velocity_limit, sight_range, boids_sim):
+        self.position = position
+        self.velocity = velocity
+        self.velocity_limit = velocity_limit
+        self.sight_range = sight_range
+        self.boids_sim = boids_sim
 
-
-class Boid:
-    def __init__(self, pos, vel, swarm):
-        self.swarm = swarm
-        self.position = pos
-        self.velocity = vel
-
-    def rule1_separation(self):
-        correction = np.array([0, 0], dtype=np.float64)
-
-        for boid in self.swarm.list:
+    def separation(self):
+        course_correction = np.array([0, 0], dtype=np.float64)
+        for boid in self.boids_sim.list_of_boids:
             if boid != self:
-                differenceMagnitude = np.linalg.norm(boid.position - self.position)
+                difference_magnitude = np.linalg.norm(boid.position - self.position)
+                if difference_magnitude < 10:
+                    course_correction = course_correction - (boid.position - self.position)
+        return course_correction / 2
 
-                if differenceMagnitude < 10:
-                    correction = correction - (boid.position - self.position)
+    def alignment(self):
+        course_correction = np.array([0, 0], dtype=np.float64)
+        for boid in self.boids_sim.list_of_boids:
+            # if boid isn't myself and sqrt(((x2 - x1)^2) + (y2 - y1)^2)  is shorter than sight range
+            if boid != self: #and math.sqrt((boid.position[0] - self.position[0])**2 + (boid.position[1] - self.position[1])**2) < self.sight_range:
+                course_correction = course_correction + boid.velocity
+        course_correction = course_correction / (self.boids_sim.number_of_boids - 1)
+        course_correction = (course_correction - self.velocity) / 10
+        return course_correction
 
-        return correction / 2
+    def cohesion(self):
+        course_correction = np.array([0, 0], dtype=np.float64)
+        for boid in self.boids_sim.list_of_boids:
+            if boid != self: #and math.sqrt((boid.position[0] - self.position[0])**2 + (boid.position[1] - self.position[1])**2) < self.sight_range:
+                course_correction = course_correction + boid.position
+        course_correction = course_correction / (self.boids_sim.number_of_boids - 1)
+        course_correction = (course_correction - self.position) / 100
+        return course_correction
 
-    def rule2_alignment(self):
-        correction = np.array([0, 0], dtype=np.float64)
+    def boundaries(self):
+        course_correction = np.array([0, 0], dtype=np.float64)
+        #horizontal boundaries
+        if self.position[0] < self.boids_sim.boundaries[0][0]:      #xmin
+            course_correction[0] = 1
+        elif self.position[0] > self.boids_sim.boundaries[0][1]:    #xmax
+            course_correction[0] = -1
+        #vertical boundaries
+        if self.position[1] < self.boids_sim.boundaries[1][0]:      #ymin
+            course_correction[1] = 1
+        elif self.position[1] > self.boids_sim.boundaries[1][1]:    #ymax
+            course_correction[1] = -1
+        return course_correction
 
-        for boid in self.swarm.list:
-            if boid != self:
-                correction = correction + boid.velocity
-
-        correction = correction / (self.swarm.sizeOfFlock - 1)
-        correction = (correction - self.velocity) / 10
-
-        return correction
-
-    def rule3_cohesion(self):
-        correction = np.array([0, 0], dtype=np.float64)
-
-        for boid in self.swarm.list:
-            if boid != self:
-                correction = correction + boid.position
-
-        correction = correction / (self.swarm.sizeOfFlock - 1)
-        correction = (correction - self.position) / 100
-
-        return correction
-
-    def rule4_bounds(self):
-        correction = np.array([0, 0], dtype=np.float64)
-
-        # Horizontal bounds
-        if self.position[0] < self.swarm.bounds[0][0]:  # xmin
-            correction[0] = 1
-        elif self.position[0] > self.swarm.bounds[0][1]:  # xmax
-            correction[0] = -1
-
-        # Vertical bounds
-        if self.position[1] < self.swarm.bounds[1][0]:  # ymin
-            correction[1] = 1
-        elif self.position[1] > self.swarm.bounds[1][1]:  # ymax
-            correction[1] = -1
-
-        return correction
-
-    def limitVelocity(self):
-        vlim = 5.0
-
-        velMagnitude = np.linalg.norm(self.velocity)
-
-        # Limit speed if necessary
-        if velMagnitude > vlim:
-            self.velocity = (self.velocity / velMagnitude) * vlim
-            
-X_LIM = [ 0, 1000 ]
-Y_LIM = [ 0, 1000 ]
-swarm = Swarm( 50, X_LIM, Y_LIM )
-
-fig = plt.figure()
-ax = plt.axes( xlim=X_LIM, ylim=Y_LIM )
-graph, = ax.plot([], [], 'o')
+    def limit_velocity(self):
+        velocity_magnitude = np.linalg.norm(self.velocity)
+        #limit velocity if necessary
+        if velocity_magnitude > self.velocity_limit:
+            self.velocity = (self.velocity / velocity_magnitude) * self.velocity_limit
 
 
 def update(i) :
-    #swarm.simplePrintSwarm()
-    swarm.updateSwarm()
-
+    boids_sim.update_boids_sim()
     boid_pos_x = []
     boid_pos_y = []
-    
-    #data_vel = []
-
-    for boid in swarm.list :
+    for boid in boids_sim.list_of_boids :
         boid_pos_x.append( boid.position[0] )
         boid_pos_y.append( boid.position[1] )
-        #data_vel.append( boid.velocity )
-        
     graph.set_data(boid_pos_x, boid_pos_y)
     return graph
 
 
-ani = animation.FuncAnimation(fig, update, frames=30, interval=10)
-
-plt.show()
+boids_sim = boids_sim(60, 1000, 1000, 7.0, 40)  #main function. arguments: number of boids, width, height, velocity limit
+fig = plt.figure()
+axis = plt.axes(xlim=[0, 1000], ylim=[0, 1000])
+graph, = axis.plot([], [], '.')
+anim = animation.FuncAnimation(fig, update, frames=30, interval=10)
 
