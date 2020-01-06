@@ -72,14 +72,18 @@ class boid:
         course_correction = np.array([0, 0], dtype=np.float64)
         #horizontal boundaries
         if self.position[0] < self.boids_sim.boundaries[0][0]:      #xmin
-            course_correction[0] = 1
+#            course_correction[0] = 1
+            self.position[0] = self.boids_sim.boundaries[0][1]
         elif self.position[0] > self.boids_sim.boundaries[0][1]:    #xmax
-            course_correction[0] = -1
+#            course_correction[0] = -1
+            self.position[0] = self.boids_sim.boundaries[0][0]
         #vertical boundaries
         if self.position[1] < self.boids_sim.boundaries[1][0]:      #ymin
-            course_correction[1] = 1
+#            course_correction[1] = 1
+            self.position[1] = self.boids_sim.boundaries[1][1]
         elif self.position[1] > self.boids_sim.boundaries[1][1]:    #ymax
-            course_correction[1] = -1
+#            course_correction[1] = -1
+            self.position[1] = self.boids_sim.boundaries[1][0]
         return course_correction
 
     def limit_velocity(self):
