@@ -1,4 +1,31 @@
-import pandas as pd
+##from scipy.optimize import leastsq
+##from scipy.optimize import curve_fit
+#import matplotlib.pyplot as plt
+#import numpy as np
+#
+##time intervals
+#t = np.linspace(0.0, 25.0, num=100)
+#def bass_model(t, p, q, m):
+#    F = (p*(np.exp((p+q)*t)-1))/(p*(np.exp((p+q)*t))+q)
+#    #f = (np.exp((p+q)*t)*p*(p+q)**2)/((p*(np.exp((p+q)*t))+q)**2)
+#    #f2=(((p+q)**2)/(p))*((np.exp(-(p+q)*t))/((1+(q/p)*np.exp(-(p+q)*t))**2))
+#    S = m*(((p+q)**2)/(p))*((np.exp(-(p+q)*t))/((1+(q/p)*np.exp(-(p+q)*t))**2))
+#    S2=1-F
+##    return F
+##    return S
+#    return F, S, S2
+#   
+#if __name__ == "__main__":
+#    wynikF, wynikS, wynikS2 = bass_model(t, 0.03, 0.38, 30)
+#    plt.plot(t, wynikF)
+#    plt.plot(t, wynikS)
+#    plt.plot(t, wynikS2)
+#    plt.title("Adopters")
+
+
+#####################################################################################################################################################################################
+
+#import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -6,37 +33,49 @@ def agent_bass_diff(p, q, M, T):
     adopters = list()
     x = np.zeros((M,), np.float32)
     x_tmp = np.zeros((M,), np.float32)
-    for j in range(T):
+    for j in range(len(T)):
         for i in range(1,M):
             prob = (p + q * (sum(x) / M)) * (1 - x[i])
             if np.random.uniform(0,1,1) <= prob:
                 x_tmp[i] = 1
         x = x_tmp
         adopters.append(sum(x))
-    return adopters
+    F = (p*(np.exp((p+q)*T)-1))/(p*(np.exp((p+q)*T))+q)
+    S = M*(((p+q)**2)/(p))*((np.exp(-(p+q)*T))/((1+(q/p)*np.exp(-(p+q)*T))**2))
+    S2 = 1 - F
+    return adopters, F, S, S2
 
 if __name__ == "__main__":
-    simulation = [agent_bass_diff(0.03, 0.38, 1000, 25) for _ in range(25)]
-    df = pd.DataFrame(np.array(simulation))
-    df = df.transpose()
+    T = np.linspace(0.0, 25.0, num=100)
+    adopters, F, S, S2 = agent_bass_diff(0.03, 0.38, 35, T)
+#    df = pd.DataFrame(np.array(adopters))
+#    df = df.transpose()
+#    
+#    df['time'] = range(1,26)
+#    column_list = df.columns.tolist()
+#    column_list = column_list[-1:] + column_list[:-1]
+#    df = df[column_list]
+#    
+#    a = df.columns[range(1,26)]
+#    b = ['sim ' + str(i) for i in range(1, len(a) + 1)]
+#    d = dict(zip(a, b))
+#    df = df.rename(columns = d)
     
-    df['time'] = range(1,26)
-    column_list = df.columns.tolist()
-    column_list = column_list[-1:] + column_list[:-1]
-    df = df[column_list]
-    
-    a = df.columns[range(1,26)]
-    b = ['sim ' + str(i) for i in range(1, len(a) + 1)]
-    d = dict(zip(a, b))
-    df = df.rename(columns = d)
-    
-    for column in df.drop('time', axis=1):
-        plt.plot(df['time'], df[column], marker='.', label = column)
-    
-    plt.title("Agent Based Bass Diffusion Model")
+    plt.figure(1)
+#    for column in df.drop('time', axis=1):
+    plt.plot(T, adopters)
+    plt.title("Agent Based Bass Diffusion Model 1")
     plt.xlabel("Time")
     plt.ylabel("Adopters")
     
+    plt.figure(2)
+    plt.plot(T, F)
+    plt.plot(T, S)
+    plt.plot(T, S2)
+    plt.title("Agent Based Bass Diffusion Model 2")
+    plt.xlabel("Time")
+    plt.ylabel("Adopters")
+
 
 #####################################################################################################################################################################################
 
